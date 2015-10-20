@@ -1,0 +1,65 @@
+---
+- hosts: all
+  remote_user: alexis
+  become: yes
+  become_user: root
+  tasks:
+    - name: fetch server updates
+      apt: update_cache=yes
+    - name: upgrade server
+      apt: upgrade=yes
+    - name: install ruby
+      apt: install_recommends=yes name=ruby
+    - name: install nodejs
+      apt: install_recommends=yes name=nodejs
+    - name: install npm
+      apt: install_recommends=yes name=npm  
+    - name: install bower
+      npm: global=yes name=bower
+    - name: install redis
+      apt: install_recommends=yes name=redis-server
+    - name: install imagemagick
+      apt: install_recommends=yes name=imagemagick
+    - name: install nginx
+      apt: install_recommends=yes name=nginx
+    # python and dependencies installation ================
+    - name: install python
+      apt: install_recommends=yes name={{item}}
+      with_items:
+        - python-setuptools
+        - python-dev
+        - build-essential
+    # ======================================================
+    - name: install postgresql
+      apt: install_recommends=yes name={{ item }}
+      with_items:
+        - postgresql-9.3
+        - postgresql-contrib
+        - python-psycopg2 # required for ansible to manage the database with postgresql_user module
+        - libpq-dev
+    - name: change postgresql access mode for remote connections  
+      lineinfile: 
+        dest=/etc/postgresql/9.3/main/pg_hba.conf
+        regexp='local\s+all\s+postgres\s+peer'
+        line='local all postgres md5'
+        insertbefore=BOF 
+      notify: 
+        - restart postgresql
+    - name: create base database
+      postgresql_db:
+        name=alexis 
+        login_user=postgres
+        login_password={{ postgres_password }}
+        state=present
+    - name: create base user
+      postgresql_user: 
+        name=alexis
+        login_user=postgres
+        login_password={{ postgres_password }}
+        password={{ postgres_password }}
+        priv=ALL
+        db=alexis
+        state=present
+  handlers:
+    - name: restart postgresql
+      service: name=postgresql state=restarted
